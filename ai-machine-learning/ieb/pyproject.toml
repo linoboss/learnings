@@ -1,0 +1,20 @@
+[project]
+name = "ieb"
+version = "0.1.0"
+description = "Data analysis environment"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "pandas",
+    "matplotlib",
+    "jupyterlab",
+]
+
+[tool.uv]
+# Dev-only tools that aren't part of the project's runtime deps.
+# Install them too with: uv sync --extra dev  (or `uv sync --all-extras`)
+
+[project.optional-dependencies]
+dev = [
+    "ipykernel",
+]
