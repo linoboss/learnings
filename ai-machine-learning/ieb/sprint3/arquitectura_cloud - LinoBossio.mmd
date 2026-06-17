@@ -1,0 +1,69 @@
+---
+title: Arquitectura cloud (Microsoft Azure) para el modelo de predicción de precios de vivienda
+---
+flowchart LR
+    %% ===== Zona 1: Ingesta y data lake =====
+    subgraph Z1["1 · INGESTA Y DATA LAKE"]
+        direction TB
+        SRC["<b>Fuentes</b><br/>CSV / portales<br/>inmobiliarios / API"]:::src
+        RAW["<b>Data Lake Storage Gen2</b><br/>Zona RAW (datos crudos)"]:::azure
+        ADF["<b>Azure Data Factory</b><br/>ETL: limpieza<br/>(p99, variables derivadas)"]:::azure
+        CUR["<b>Data Lake Storage Gen2</b><br/>Zona CURATED (datos limpios)"]:::azure
+        SYN["Azure Synapse / Databricks<br/>exploración SQL"]:::aux
+        SRC --> RAW --> ADF --> CUR --> SYN
+    end
+
+    %% ===== Zona 2: Entrenamiento (Azure ML / MLOps) =====
+    subgraph Z2["2 · ENTRENAMIENTO · Azure ML"]
+        direction TB
+        TRAIN["<b>Azure ML</b><br/>Compute + Training<br/>(este cuaderno)"]:::ml
+        EXP["<b>Experimentos</b><br/>CV 5-fold · métricas R²/MAE"]:::ml
+        REG["<b>Model Registry</b><br/>versionado y aprobación"]:::ml
+        BATCH["<b>Azure ML</b><br/>Batch Endpoint<br/>(scoring masivo)"]:::ml
+        CICD["Azure DevOps / GitHub Actions · CI/CD MLOps"]:::aux
+        TRAIN --> EXP
+        TRAIN --> REG --> BATCH
+        REG -.-> CICD
+    end
+
+    %% ===== Zona 3: Inferencia y consumo =====
+    subgraph Z3["3 · INFERENCIA Y CONSUMO"]
+        direction TB
+        EP["<b>Managed Online Endpoint</b><br/>Azure ML · tiempo real<br/>(autoescalado)"]:::azure
+        FUNC["<b>Azure Functions</b><br/>pre/post-proceso<br/>de la petición"]:::azure
+        APIM["<b>API Management</b><br/>REST API segura"]:::azure
+        APP["<b>Aplicación</b><br/>web / portal / BI (Power BI)"]:::app
+        USERS["Usuarios finales / tasadores"]:::aux
+        EP <--> FUNC
+        EP --> APIM --> APP --> USERS
+        FUNC --> APP
+    end
+
+    %% ===== Conexiones entre zonas =====
+    CUR ==> TRAIN
+    REG ==> EP
+
+    %% ===== Capas transversales =====
+    subgraph ZX["CAPAS TRANSVERSALES"]
+        direction LR
+        SEC["<b>Seguridad</b><br/>Entra ID + RBAC ·<br/>Key Vault · VNet privada"]:::sec
+        OBS["<b>Observabilidad</b><br/>Azure Monitor + App Insights ·<br/>data drift monitor (Azure ML)"]:::gov
+        GOV["<b>Gobierno y coste</b><br/>Azure Policy · Activity Log ·<br/>Cost Management"]:::gov
+        RETR["<b>Reentrenamiento</b><br/>Event Grid dispara<br/>re-training ante drift"]:::ml
+    end
+
+    %% Bucle de reentrenamiento
+    RETR -.->|drift detectado| TRAIN
+
+    classDef azure fill:#0078D4,stroke:#243A5E,color:#ffffff,stroke-width:1px;
+    classDef ml fill:#1B9E77,stroke:#243A5E,color:#ffffff,stroke-width:1px;
+    classDef app fill:#4C72B0,stroke:#243A5E,color:#ffffff,stroke-width:1px;
+    classDef src fill:#5A6B7B,stroke:#243A5E,color:#ffffff,stroke-width:1px;
+    classDef sec fill:#C44E52,stroke:#243A5E,color:#ffffff,stroke-width:1px;
+    classDef gov fill:#243A5E,stroke:#243A5E,color:#ffffff,stroke-width:1px;
+    classDef aux fill:#E8ECF1,stroke:#5A6B7B,color:#243A5E,stroke-width:1px;
+
+    style Z1 fill:#F4F8FC,stroke:#4C72B0,stroke-width:2px,color:#243A5E
+    style Z2 fill:#F2FAF7,stroke:#1B9E77,stroke-width:2px,color:#243A5E
+    style Z3 fill:#F4F8FC,stroke:#0078D4,stroke-width:2px,color:#243A5E
+    style ZX fill:#FAFAFA,stroke:#243A5E,stroke-width:2px,color:#243A5E
